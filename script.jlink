@@ -1,0 +1,7 @@
+ExitOnError 1
+r
+h
+loadfile "E:\NXP\workspace_v11\evkbimxrt1050_canopen\Debug\evkbimxrt1050_canopen.hex"
+qc
+
+qc
