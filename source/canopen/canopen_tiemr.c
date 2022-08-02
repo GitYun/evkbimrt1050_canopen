@@ -10,14 +10,6 @@
 #include "canfestival/mimxrt1052/canfestival.h"
 #include "canfestival/timers.h"
 
-#if defined (USE_RTOS) && (USE_RTOS == 1)
-
-#define CANOPEN_TIMER_HW_BASE
-#define CANOPEN_TIEMR_IRQn
-#define CANOPEN_TIMER_ISR       rtos_systick_hook
-
-#else
-
 #define IRQ_NUM(x)      x ## _IRQn
 #define IRQ_ISR(x)      x ## _IRQHandler
 
@@ -25,66 +17,36 @@
 #define CANOPEN_TIEMR_IRQn      IRQ_NUM(GPT2)
 #define CANOPEN_TIMER_ISR       IRQ_ISR(GPT2)
 
-#endif
+#define g_next_dispatch_counter_val CANOPEN_TIMER_HW_BASE->OCR[kGPT_OutputCompare_Channel1]
+
+TIMEVAL g_next_dispatch_counter_base = 0;
 
 TIMEVAL g_last_dispatch_counter_val = 0;
-TIMEVAL g_next_dispatch_counter_val = 0;
-TIMEVAL g_elapsed_time = 0;
+
 
 void setTimer(TIMEVAL value)
 {
-//    g_next_dispatch_counter_val = GPT_GetCurrentTimerCount(CANOPEN_TIMER_HW_BASE) + value;
-
-    TIMEVAL current_counter = GPT_GetCurrentTimerCount(CANOPEN_TIMER_HW_BASE);
-    g_elapsed_time += current_counter - g_last_dispatch_counter_val;
-    g_last_dispatch_counter_val = current_counter;
-
-    GPT_SetOutputCompareValue(CANOPEN_TIMER_HW_BASE, kGPT_OutputCompare_Channel1, current_counter + value);
+    g_next_dispatch_counter_val = g_next_dispatch_counter_base + value;
 }
 
 TIMEVAL getElapsedTime(void)
 {
-//    return GPT_GetCurrentTimerCount(CANOPEN_TIMER_HW_BASE) - g_last_dispatch_counter_val;
+    g_next_dispatch_counter_base = GPT_GetCurrentTimerCount(CANOPEN_TIMER_HW_BASE);
 
-    TIMEVAL current_counter = GPT_GetCurrentTimerCount(CANOPEN_TIMER_HW_BASE);
-    TIMEVAL elapsed = (TIMEVAL)(current_counter - g_last_dispatch_counter_val) + g_elapsed_time;
-
-    return elapsed;
+    return g_next_dispatch_counter_base - g_last_dispatch_counter_val;
 }
 
 void tiemrElapsed(void)
 {
-//    TIMEVAL current_counter = GPT_GetCurrentTimerCount(CANOPEN_TIMER_HW_BASE);
-//
-//    if (current_counter >= g_next_dispatch_counter_val) {
-//        g_last_dispatch_counter_val = current_counter;
-//        TimeDispatch();
-//    }
+    TIMEVAL current_timer_count = GPT_GetCurrentTimerCount(CANOPEN_TIMER_HW_BASE);
+    TIMEVAL expect_timer_count = g_next_dispatch_counter_val;
 
-    g_elapsed_time = 0;
-    g_last_dispatch_counter_val = 0;
-
-    TimeDispatch();
+    if ((current_timer_count - g_last_dispatch_counter_val) >=
+            (expect_timer_count - g_last_dispatch_counter_val)) {
+        g_last_dispatch_counter_val = expect_timer_count;
+        TimeDispatch();
+    }
 }
-
-#if defined (USE_RTOS) && (USE_RTOS == 1)
-
-void initTimer(void)
-{
-
-}
-
-void clearTimer(void)
-{
-
-}
-
-void CANOPEN_TIMER_ISR(void)
-{
-    tiemrElapsed();
-}
-
-#else
 
 void initTimer(void)
 {
@@ -98,7 +60,6 @@ void initTimer(void)
 
     GPT_Init(CANOPEN_TIMER_HW_BASE, &cfg);
 
-//    GPT_EnableInterrupts(CANOPEN_TIMER_HW_BASE, kGPT_RollOverFlagInterruptEnable);
     GPT_EnableInterrupts(CANOPEN_TIMER_HW_BASE, kGPT_OutputCompare1InterruptEnable);
 
     EnableIRQ(CANOPEN_TIEMR_IRQn);
@@ -110,7 +71,6 @@ void clearTimer(void)
 {
     GPT_Deinit(CANOPEN_TIMER_HW_BASE);
 
-//    GPT_DisableInterrupts(CANOPEN_TIMER_HW_BASE, kGPT_RollOverFlagInterruptEnable);
     GPT_DisableInterrupts(CANOPEN_TIMER_HW_BASE, kGPT_OutputCompare1InterruptEnable);
 
     DisableIRQ(CANOPEN_TIEMR_IRQn);
@@ -120,10 +80,11 @@ void clearTimer(void)
 
 void CANOPEN_TIMER_ISR(void)
 {
-//    GPT_ClearStatusFlags(CANOPEN_TIMER_HW_BASE, kGPT_RollOverFlag);
-    GPT_ClearStatusFlags(CANOPEN_TIMER_HW_BASE, kGPT_OutputCompare1Flag);
+    if (GPT_GetStatusFlags(CANOPEN_TIMER_HW_BASE, kGPT_OutputCompare1Flag) != 0) {
+        GPT_ClearStatusFlags(CANOPEN_TIMER_HW_BASE, kGPT_OutputCompare1Flag);
 
-    tiemrElapsed();
+        tiemrElapsed();
+    }
 
     /* Add for ARM errata 838869, affects Cortex-M4, Cortex-M4F, Cortex-M7, Cortex-M7F Store immediate overlapping
       exception return operation might vector to incorrect interrupt */
@@ -131,5 +92,3 @@ void CANOPEN_TIMER_ISR(void)
         __DSB();
     #endif
 }
-
-#endif // defined (USE_RTOS) && (USE_RTOS == 1)

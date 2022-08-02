@@ -57,7 +57,7 @@ e_nodeState getNodeState (CO_Data* d, UNS8 nodeId)
   return networkNodeState;
 }
 
-/*! 
+/*!
 ** The Consumer Timer Callback
 **
 ** @param d
@@ -72,7 +72,7 @@ void ConsumerHeartbeatAlarm(CO_Data* d, UNS32 id)
   /* timer have been notified and is now free (non periodic)*/
   /* -> avoid deleting re-assigned timer if message is received too late*/
   d->ConsumerHeartBeatTimers[id]=TIMER_NONE;
-  
+
   /* set node state */
   d->NMTable[nodeId] = Disconnected;
   /*! call heartbeat error with NodeId */
@@ -120,7 +120,7 @@ void proceedNODE_GUARD(CO_Data* d, Message* m )
       e_nodeState newNodeState = (e_nodeState) ((*m).data[0] & 0x7F);
 
       MSG_WAR(0x3110, "Received NMT nodeId : ", nodeId);
-      
+
       /*!
       ** Record node response for node guarding service
       */
@@ -196,14 +196,14 @@ void ProducerHeartbeatAlarm(CO_Data* d, UNS32 id)
 
 /**
  * @brief The guardTime - Timer Callback.
- * 
+ *
  * This function is called every GuardTime (OD 0x100C) ms <br>
  * On every call, a NodeGuard-Request is sent to all nodes which have a
  * node-state not equal to "Unknown" (according to NMTable). If the node has
  * not responded within the lifetime, the nodeguardError function is called and
  * the status of this node is set to "Disconnected"
  *
- * @param d 	Pointer on a CAN object data structure 
+ * @param d 	Pointer on a CAN object data structure
  * @param id
  * @ingroup nodeguardo
  */
@@ -215,7 +215,7 @@ void GuardTimeAlarm(CO_Data* d, UNS32 id)
     MSG_WAR(0x00, "Producing nodeguard-requests: ", 0);
 
     for (i = 0; i < NMT_MAX_NODE_ID; i++) {
-      /** Send node guard request to all nodes except this node, if the 
+      /** Send node guard request to all nodes except this node, if the
       * node state is not "Unknown_state"
       */
       if (d->NMTable[i] != Unknown_state && i != *d->bDeviceNodeId) {
@@ -255,7 +255,7 @@ void GuardTimeAlarm(CO_Data* d, UNS32 id)
  * This function is called, if index 0x100C or 0x100D is updated to
  * restart the node-guarding service with the new parameters
  *
- * @param d 	Pointer on a CAN object data structure 
+ * @param d 	Pointer on a CAN object data structure
  * @param unused_indextable
  * @param unused_bSubindex
  * @ingroup nodeguardo
@@ -325,7 +325,7 @@ void nodeguardInit(CO_Data* d)
 
     for (i = 0; i < NMT_MAX_NODE_ID; i++) {
       /** Set initial value for the nodes */
-      if (d->NMTable[i] != Unknown_state && i != *d->bDeviceNodeId) { 
+      if (d->NMTable[i] != Unknown_state && i != *d->bDeviceNodeId) {
         d->nodeGuardStatus[i] = *d->LifeTimeFactor;
       }
     }
